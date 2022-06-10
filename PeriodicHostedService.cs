@@ -18,23 +18,34 @@ class PeriodicHostedService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // Use PeriodicTimer to prevent blocking of resources
+        // ExecuteAsync is executed once and we have to take care of a mechanism ourselves that is kept during operation.
+        // To do this, we can use a Periodic Timer, which, unlike other timers, does not block resources.
+        // But instead, WaitForNextTickAsync provides a mechanism that blocks a task and can thus be used in a While loop.
         using PeriodicTimer timer = new PeriodicTimer(_period);
+
+        // When ASP.NET Core is intentionally shut down, the background service receives information
+        // via the stopping token that it has been canceled.
+        // We check the cancellation to avoid blocking the application shutdown.
         while (
-            // Repeat while Hosted Service is not stopped
             !stoppingToken.IsCancellationRequested &&
-            // Wait for the timer to tick but as long as Hosted Service is not stopped
             await timer.WaitForNextTickAsync(stoppingToken))
         {
             try
             {
                 if (IsEnabled)
                 {
-                    // Create a scope
+                    // We cannot use the default dependency injection behavior, because ExecuteAsync is
+                    // a long-running method while the background service is running.
+                    // To prevent open resources and instances, only create the services and other references on a run
+
+                    // Create scope, so we get request services
                     await using AsyncServiceScope asyncScope = _factory.CreateAsyncScope();
+                    
                     // Get service from scope
                     SampleService sampleService = asyncScope.ServiceProvider.GetRequiredService<SampleService>();
                     await sampleService.DoSomethingAsync();
+
+                    // Sample count increment
                     _executionCount++;
                     _logger.LogInformation(
                         $"Executed PeriodicHostedService - Count: {_executionCount}");
