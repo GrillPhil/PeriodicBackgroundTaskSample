@@ -1,13 +1,17 @@
 using PeriodicBackgroundTaskSample;
 
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddScoped<SampleService>();
+
+// Register as singleton first so it can be injected through Dependency Injection
 builder.Services.AddSingleton<PeriodicHostedService>();
+
+// Add as hosted service using the instance registered as singleton before
 builder.Services.AddHostedService(
     provider => provider.GetRequiredService<PeriodicHostedService>());
 
-var app = builder.Build();
+WebApplication app = builder.Build();
 
 app.MapGet("/", () => "Hello World!");
 app.MapGet("/background", (

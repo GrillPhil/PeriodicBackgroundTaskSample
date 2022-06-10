@@ -18,17 +18,22 @@ class PeriodicHostedService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var timer = new PeriodicTimer(_period);
+        // Use PeriodicTimer to prevent blocking of resources
+        using PeriodicTimer timer = new PeriodicTimer(_period);
         while (
+            // Repeat while Hosted Service is not stopped
             !stoppingToken.IsCancellationRequested &&
+            // Wait for the timer to tick but as long as Hosted Service is not stopped
             await timer.WaitForNextTickAsync(stoppingToken))
         {
             try
             {
                 if (IsEnabled)
                 {
-                    await using var asyncScope = _factory.CreateAsyncScope();
-                    var sampleService = asyncScope.ServiceProvider.GetRequiredService<SampleService>();
+                    // Create a scope
+                    await using AsyncServiceScope asyncScope = _factory.CreateAsyncScope();
+                    // Get service from scope
+                    SampleService sampleService = asyncScope.ServiceProvider.GetRequiredService<SampleService>();
                     await sampleService.DoSomethingAsync();
                     _executionCount++;
                     _logger.LogInformation(
